@@ -1,32 +1,23 @@
-import * as fs from 'fs'
-import { safeDump } from 'js-yaml'
-import { AddressInfo, Server } from 'net'
-import * as path from 'path'
+import JSYAML from 'js-yaml'
+import express from 'express'
 import request from 'request-promise-native'
 
-import { main } from '../src'
+import { validator } from '../src/validate'
+import { Server } from 'net'
 
 describe('validate', () => {
-  let uri: string
   let server: Server
+  let port = 3003
+  let uri = `http://localhost:${port}/validate`
 
-  beforeAll(() => {
-    process.env.APP_ID = '1234'
-    process.env.WEBHOOK_SECRET = 'secret'
-    process.env.PRIVATE_KEY = fs.readFileSync(
-      path.resolve(__dirname, './__fixtures__/cert.pem'),
-      'UTF-8',
-    )
-    process.env.DISABLE_STATS = 'true'
-
-    server = main(0)
-    const { port } = server.address() as AddressInfo
-
-    uri = `http://localhost:${port}/validate`
+  beforeAll(done => {
+    const app = express()
+    app.use('/validate', validator)
+    server = app.listen(port, done)
   })
 
-  afterAll(() => {
-    server.close()
+  afterAll(done => {
+    server.close(done)
   })
 
   test('shows correct usage description', async () => {
@@ -40,7 +31,7 @@ describe('validate', () => {
   })
 
   test('correctly reports invalid configuration', async () => {
-    const config = safeDump({
+    const config = JSYAML.safeDump({
       opencollective: 'https://opencollective.com/graphql-shield',
     })
 
@@ -61,7 +52,7 @@ describe('validate', () => {
       })
   })
 
-  test('correctly handles invalid input', async () => {
+  test('correctly handles invalid input, YAMLException', async () => {
     const config = `f123
       opencollective: 'https://opencollective.com/graphql-shield',
     `
@@ -79,12 +70,39 @@ describe('validate', () => {
         fail()
       })
       .catch(err => {
-        expect(err).toMatchSnapshot()
+        console.log(err.message)
+        expect(err.message).toContain('YAML file is not properly formatted')
       })
   })
 
+  test('correctly handles unexpected errors', async () => {
+    const baseSafeLoad = JSYAML.safeLoad
+
+    // mock safe load
+    JSYAML.safeLoad = () => {
+      throw new Error('Test')
+    }
+
+    try {
+      await expect(
+        request({
+          uri,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: JSYAML.safeDump({
+            collective: 'graphql-shield',
+          }),
+        }),
+      ).rejects.toMatchSnapshot()
+    } finally {
+      JSYAML.safeLoad = baseSafeLoad
+    }
+  })
+
   test('correctly validates valid configuration', async () => {
-    const config = safeDump({
+    const config = JSYAML.safeDump({
       collective: 'graphql-shield',
     })
 

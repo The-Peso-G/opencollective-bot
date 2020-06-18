@@ -4,11 +4,14 @@ import * as probot from 'probot'
 import { opencollective } from '../../src/bot'
 
 import installationRepositoriesFixture from '../__fixtures__/installation_repositories.added'
+import repository from '../__fixtures__/repos.get-1'
 
 beforeEach(async () => {
   if (!nock.isActive()) nock.activate()
 
   process.env.FEATURE_DISABLE_CONFIGURATION = 'TRUE'
+  process.env.FEATURE_DISABLE_FUNDING_PACKAGE_JSON = 'TRUE'
+  process.env.DISABLE_WEBHOOK_EVENT_CHECK = 'TRUE'
 })
 
 afterEach(async () => {
@@ -16,6 +19,8 @@ afterEach(async () => {
   nock.cleanAll()
 
   delete process.env.FEATURE_DISABLE_CONFIGURATION
+  delete process.env.FEATURE_DISABLE_FUNDING_PACKAGE_JSON
+  delete process.env.DISABLE_WEBHOOK_EVENT_CHECK
 })
 
 describe('opencollective installation_repositories', () => {
@@ -35,10 +40,7 @@ describe('opencollective installation_repositories', () => {
     const github = {
       repos: {
         get: jest.fn().mockResolvedValue({
-          // we're just interested in default_branch
-          data: {
-            default_branch: 'master',
-          },
+          data: repository,
         }),
         getBranch: jest.fn().mockRejectedValue(new Error('Branch not found')),
         getContents: jest.fn().mockImplementation(({ ref }) => {
@@ -82,7 +84,7 @@ describe('opencollective installation_repositories', () => {
       payload: installationRepositoriesFixture,
     })
 
-    expect(github.repos.get).toBeCalledTimes(1)
+    expect(github.repos.get).toBeCalledTimes(2)
     expect(github.repos.getBranch).toBeCalledTimes(1)
     expect(github.repos.getContents).toBeCalledTimes(2)
     expect(github.repos.createOrUpdateFile).toBeCalledTimes(1)
@@ -105,10 +107,7 @@ describe('opencollective installation_repositories', () => {
     const github = {
       repos: {
         get: jest.fn().mockResolvedValue({
-          // we're just interested in default_branch
-          data: {
-            default_branch: 'master',
-          },
+          data: repository,
         }),
         getBranch: jest.fn().mockRejectedValue(new Error('Branch not found')),
         getContents: jest.fn().mockImplementation(({ ref }) => {
@@ -152,7 +151,7 @@ describe('opencollective installation_repositories', () => {
       payload: installationRepositoriesFixture,
     })
 
-    expect(github.repos.get).toBeCalledTimes(1)
+    expect(github.repos.get).toBeCalledTimes(2)
     expect(github.repos.getBranch).toBeCalledTimes(1)
     expect(github.repos.getContents).toBeCalledTimes(2)
     expect(github.repos.createOrUpdateFile).toBeCalledTimes(1)
@@ -175,10 +174,7 @@ describe('opencollective installation_repositories', () => {
     const github = {
       repos: {
         get: jest.fn().mockResolvedValue({
-          // we're just interested in default_branch
-          data: {
-            default_branch: 'master',
-          },
+          data: repository,
         }),
         getBranch: jest.fn().mockRejectedValue(new Error('Branch not found')),
         getContents: jest.fn().mockImplementation(() => {
@@ -219,7 +215,7 @@ describe('opencollective installation_repositories', () => {
     })
 
     expect(github.repos.getContents).toBeCalledTimes(2)
-    expect(github.repos.get).toBeCalledTimes(0)
+    expect(github.repos.get).toBeCalledTimes(1)
     expect(github.repos.getBranch).toBeCalledTimes(0)
     expect(github.git.deleteRef).toBeCalledTimes(0)
     expect(github.git.getRef).toBeCalledTimes(0)

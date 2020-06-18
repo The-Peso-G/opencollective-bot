@@ -1,6 +1,3 @@
-import fs from 'fs'
-import path from 'path'
-
 import * as joi from '@hapi/joi'
 import * as probot from 'probot'
 import yaml from 'js-yaml'
@@ -8,6 +5,8 @@ import { flatten, intersection } from 'lodash'
 
 import { Tier } from './collective'
 import { GithubLabel } from './github'
+
+import defaultConfigAsString from './assets/default-config'
 
 export type Config = {
   collective: string
@@ -23,12 +22,7 @@ export type TierConfig = {
 
 export type Message = string
 
-const defaultConfig = yaml.safeLoad(
-  fs.readFileSync(
-    path.resolve(__dirname, './assets/default-config.yml'),
-    'utf8',
-  ),
-)
+const defaultConfig = yaml.safeLoad(defaultConfigAsString)
 
 /* Schema */
 
@@ -41,26 +35,23 @@ const tierConfigSchema = joi.object().keys({
   message: joi.string().required(),
 })
 
-export const configSchema = joi
-  .object()
-  .keys({
-    collective: joi
-      .string()
-      .regex(/^[\w\-]+$/, 'Use your collective slug.')
-      .required(),
-    tiers: joi
-      .array()
-      .items(tierConfigSchema)
-      .optional()
-      .default(defaultConfig.tiers),
-    invitation: joi
-      .string()
-      .default(defaultConfig.invitation)
-      .allow(false)
-      .optional()
-      .description('An invitation message shown to non-backers'),
-  })
-  .requiredKeys(['collective'])
+export const configSchema = joi.object().keys({
+  collective: joi
+    .string()
+    .regex(/^[\w\-]+$/, 'Use your collective slug.')
+    .required(),
+  tiers: joi
+    .array()
+    .items(tierConfigSchema)
+    .optional()
+    .default(defaultConfig.tiers),
+  invitation: joi
+    .string()
+    .default(defaultConfig.invitation)
+    .allow(false)
+    .optional()
+    .description('An invitation message shown to non-backers'),
+})
 
 /**
  *
@@ -73,7 +64,7 @@ export async function getConfig(
 ): Promise<Config | null> {
   try {
     const config = await context.config('opencollective.yml')
-    const value = await joi.validate(config, configSchema)
+    const value = await configSchema.validateAsync(config)
 
     return value
   } catch (err) {
